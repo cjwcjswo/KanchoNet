@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package GameProto;
+
+// 게임 메시지 예제
+message GameMessage {
+    int32 message_type = 1;
+    int64 user_id = 2;
+    string data = 3;
+}
+
+// 게임 응답 예제
+message GameResponse {
+    bool result = 1;
+    string message = 2;
+}
+
+// 플레이어 정보
+message PlayerInfo {
+    int64 player_id = 1;
+    string nickname = 2;
+    int32 level = 3;
+    int32 experience = 4;
+}
+
+// 위치 정보
+message Position {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+
+// 이동 요청
+message MoveRequest {
+    int64 player_id = 1;
+    Position target_position = 2;
+}
+
+// 이동 브로드캐스트
+message MoveBroadcast {
+    int64 player_id = 1;
+    Position current_position = 2;
+    Position target_position = 3;
+}
+
