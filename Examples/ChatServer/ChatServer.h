@@ -30,10 +30,20 @@ struct ChatUser
 class ChatServer : public KanchoNet::NetworkEngine<ChatNetworkModel>
 {
 public:
+    // public 멤버변수 (없음)
+    
+private:
+    // private 멤버변수
+    std::unordered_map<KanchoNet::SessionID, ChatUser*> mUsers;
+    std::mutex mUsersMutex;
+    
+public:
+    // 생성자, 파괴자
     ChatServer() = default;
     virtual ~ChatServer() = default;
 
 protected:
+    // protected 함수
     // 클라이언트 접속
     void OnAccept(KanchoNet::Session* session) override
     {
@@ -85,8 +95,8 @@ protected:
             {
                 std::cout << "[Disconnect] User: " << user->username << std::endl;
                 
-                std::lock_guard<std::mutex> lock(usersMutex_);
-                users_.erase(session->GetID());
+                std::lock_guard<std::mutex> lock(mUsersMutex);
+                mUsers.erase(session->GetID());
             }
             else
             {
@@ -121,8 +131,8 @@ private:
 
         // 사용자 목록에 추가
         {
-            std::lock_guard<std::mutex> lock(usersMutex_);
-            users_[session->GetID()] = user;
+            std::lock_guard<std::mutex> lock(mUsersMutex);
+            mUsers[session->GetID()] = user;
         }
 
         std::cout << "[Login] User: " << user->username 
@@ -169,22 +179,21 @@ private:
         {
             std::cout << "[Logout] User: " << user->username << std::endl;
             
-            std::lock_guard<std::mutex> lock(usersMutex_);
-            users_.erase(session->GetID());
+            std::lock_guard<std::mutex> lock(mUsersMutex);
+            mUsers.erase(session->GetID());
         }
     }
 
+private:
+    // private 함수
     void BroadcastMessage(const ChatProtocol::MessageBroadcastPacket& packet)
     {
-        std::lock_guard<std::mutex> lock(usersMutex_);
+        std::lock_guard<std::mutex> lock(mUsersMutex);
         
-        for (auto& pair : users_)
+        for (auto& pair : mUsers)
         {
             Send(pair.second->session, &packet, sizeof(packet));
         }
     }
-
-    std::unordered_map<KanchoNet::SessionID, ChatUser*> users_;
-    std::mutex usersMutex_;
 };
 

@@ -13,9 +13,22 @@ namespace KanchoNet
     class BufferPool : public NonCopyable
     {
     public:
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+        size_t mBufferSize;
+        size_t mTotalAllocated;
+        std::vector<std::unique_ptr<PacketBuffer>> mPool;
+        mutable std::mutex mMutex;
+        
+    public:
+        // 생성자, 파괴자
         explicit BufferPool(size_t bufferSize, size_t initialCount = 100);
         ~BufferPool();
-
+        
+    public:
+        // public 함수
         // 버퍼 할당
         std::unique_ptr<PacketBuffer> Allocate();
         
@@ -24,17 +37,11 @@ namespace KanchoNet
         
         // 풀 상태
         size_t GetPoolSize() const;
-        size_t GetBufferSize() const { return bufferSize_; }
-        size_t GetTotalAllocated() const { return totalAllocated_; }
+        size_t GetBufferSize() const { return mBufferSize; }
+        size_t GetTotalAllocated() const { return mTotalAllocated; }
         
         // 풀 비우기
         void Clear();
-
-    private:
-        size_t bufferSize_;
-        size_t totalAllocated_;
-        std::vector<std::unique_ptr<PacketBuffer>> pool_;
-        mutable std::mutex mutex_;
     };
 
 } // namespace KanchoNet

@@ -13,16 +13,16 @@ namespace KanchoNet
     }
 
     Logger::Logger()
-        : currentLevel_(LogLevel::Info)
+        : mCurrentLevel(LogLevel::Info)
     {
     }
 
     void Logger::Log(LogLevel level, const char* format, ...)
     {
-        if (level < currentLevel_)
+        if (level < mCurrentLevel)
             return;
 
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mMutex);
 
         // 타임스탬프
         auto now = std::chrono::system_clock::now();
@@ -50,7 +50,7 @@ namespace KanchoNet
 
     void Logger::LogDebug(const char* format, ...)
     {
-        if (LogLevel::Debug < currentLevel_)
+        if (LogLevel::Debug < mCurrentLevel)
             return;
 
         va_list args;
@@ -65,7 +65,7 @@ namespace KanchoNet
 
     void Logger::LogInfo(const char* format, ...)
     {
-        if (LogLevel::Info < currentLevel_)
+        if (LogLevel::Info < mCurrentLevel)
             return;
 
         va_list args;
@@ -80,7 +80,7 @@ namespace KanchoNet
 
     void Logger::LogWarning(const char* format, ...)
     {
-        if (LogLevel::Warning < currentLevel_)
+        if (LogLevel::Warning < mCurrentLevel)
             return;
 
         va_list args;
@@ -95,7 +95,7 @@ namespace KanchoNet
 
     void Logger::LogError(const char* format, ...)
     {
-        if (LogLevel::Error < currentLevel_)
+        if (LogLevel::Error < mCurrentLevel)
             return;
 
         va_list args;

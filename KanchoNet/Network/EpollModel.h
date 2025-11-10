@@ -16,30 +16,59 @@
 namespace KanchoNet
 {
     // epoll 네트워크 모델 (Linux)
-    class EpollModel : public NonCopyable
+    class EpollModel : public INetworkModel, public NonCopyable
     {
     public:
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+        bool mInitialized;
+        bool mRunning;
+        
+        EngineConfig mConfig;
+        SocketHandle mListenSocket;
+        int mEpollFd;
+        
+        std::unique_ptr<SessionManager> mSessionManager;
+        std::unordered_map<SocketHandle, Session*> mSocketToSession;
+        
+        // 콜백 함수들
+        std::function<void(Session*)> mOnAccept;
+        std::function<void(Session*, const uint8_t*, size_t)> mOnReceive;
+        std::function<void(Session*)> mOnDisconnect;
+        std::function<void(Session*, ErrorCode)> mOnError;
+        
+        // 버퍼
+        static constexpr size_t MAX_EVENTS = 128;
+        uint8_t mReceiveBuffer[DEFAULT_BUFFER_SIZE];
+        
+    public:
+        // 생성자, 파괴자
         EpollModel();
         ~EpollModel();
-
+        
+    public:
+        // public 함수
         // INetworkModel 인터페이스 구현
-        bool Initialize(const EngineConfig& config);
-        bool StartListen();
-        bool ProcessIO(uint32_t timeoutMs = 0);
-        bool Send(Session* session, const PacketBuffer& buffer);
-        void Shutdown();
+        bool Initialize(const EngineConfig& config) override;
+        bool StartListen() override;
+        bool ProcessIO(uint32_t timeoutMs = 0) override;
+        bool Send(Session* session, const PacketBuffer& buffer) override;
+        void Shutdown() override;
 
         // 콜백 설정
-        void SetAcceptCallback(std::function<void(Session*)> callback);
-        void SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback);
-        void SetDisconnectCallback(std::function<void(Session*)> callback);
-        void SetErrorCallback(std::function<void(Session*, ErrorCode)> callback);
+        void SetAcceptCallback(std::function<void(Session*)> callback) override;
+        void SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback) override;
+        void SetDisconnectCallback(std::function<void(Session*)> callback) override;
+        void SetErrorCallback(std::function<void(Session*, ErrorCode)> callback) override;
 
         // 상태 확인
-        bool IsInitialized() const { return initialized_; }
-        bool IsRunning() const { return running_; }
+        bool IsInitialized() const { return mInitialized; }
+        bool IsRunning() const { return mRunning; }
 
     private:
+        // private 함수
         // epoll 이벤트 처리
         void ProcessAccept();
         void ProcessReceive(Session* session);
@@ -53,27 +82,6 @@ namespace KanchoNet
         
         // 세션 관리
         void CloseSession(Session* session);
-
-        // 멤버 변수
-        bool initialized_;
-        bool running_;
-        
-        EngineConfig config_;
-        SocketHandle listenSocket_;
-        int epollFd_;
-        
-        std::unique_ptr<SessionManager> sessionManager_;
-        std::unordered_map<SocketHandle, Session*> socketToSession_;
-        
-        // 콜백 함수들
-        std::function<void(Session*)> onAccept_;
-        std::function<void(Session*, const uint8_t*, size_t)> onReceive_;
-        std::function<void(Session*)> onDisconnect_;
-        std::function<void(Session*, ErrorCode)> onError_;
-        
-        // 버퍼
-        static constexpr size_t MAX_EVENTS = 128;
-        uint8_t receiveBuffer_[DEFAULT_BUFFER_SIZE];
     };
 
 } // namespace KanchoNet

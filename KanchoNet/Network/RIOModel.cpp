@@ -8,19 +8,19 @@
 
 namespace KanchoNet
 {
-    bool RIOModel::rioSupportChecked_ = false;
-    bool RIOModel::rioSupported_ = false;
+    bool RIOModel::mRioSupportChecked = false;
+    bool RIOModel::mRioSupported = false;
 
     RIOModel::RIOModel()
-        : initialized_(false)
-        , running_(false)
-        , listenSocket_(INVALID_SOCKET)
-        , completionQueue_(RIO_INVALID_CQ)
+        : mInitialized(false)
+        , mRunning(false)
+        , mListenSocket(INVALID_SOCKET)
+        , mCompletionQueue(RIO_INVALID_CQ)
     {
-        ZeroMemory(&rioFunctions_, sizeof(rioFunctions_));
-        ZeroMemory(&overlapped_, sizeof(overlapped_));
-        ZeroMemory(&recvBufferInfo_, sizeof(recvBufferInfo_));
-        ZeroMemory(&sendBufferInfo_, sizeof(sendBufferInfo_));
+        ZeroMemory(&mRioFunctions, sizeof(mRioFunctions));
+        ZeroMemory(&mOverlapped, sizeof(mOverlapped));
+        ZeroMemory(&mRecvBufferInfo, sizeof(mRecvBufferInfo));
+        ZeroMemory(&mSendBufferInfo, sizeof(mSendBufferInfo));
     }
 
     RIOModel::~RIOModel()
@@ -30,21 +30,21 @@ namespace KanchoNet
 
     bool RIOModel::Initialize(const EngineConfig& config)
     {
-        if (initialized_)
+        if (mInitialized)
         {
             LOG_ERROR("RIOModel already initialized");
             return false;
         }
 
-        config_ = config;
+        mConfig = config;
 
         // RIO 지원 여부 확인
         if (!IsRIOSupported())
         {
             LOG_ERROR("RIO is not supported on this system");
-            if (onError_)
+            if (mOnError)
             {
-                onError_(nullptr, ErrorCode::RIONotSupported);
+                mOnError(nullptr, ErrorCode::RIONotSupported);
             }
             return false;
         }
@@ -56,20 +56,20 @@ namespace KanchoNet
         }
 
         // 리슨 소켓 생성
-        listenSocket_ = SocketUtils::CreateTCPSocket();
-        if (listenSocket_ == INVALID_SOCKET)
+        mListenSocket = SocketUtils::CreateTCPSocket();
+        if (mListenSocket == INVALID_SOCKET)
         {
             SocketUtils::CleanupNetwork();
             return false;
         }
 
         // 소켓 옵션 설정
-        SocketUtils::SetSocketOption(listenSocket_, config_);
+        SocketUtils::SetSocketOption(mListenSocket, mConfig);
 
         // RIO Functions 로드
         if (!LoadRIOFunctions())
         {
-            SocketUtils::CloseSocket(listenSocket_);
+            SocketUtils::CloseSocket(mListenSocket);
             SocketUtils::CleanupNetwork();
             return false;
         }
@@ -77,51 +77,51 @@ namespace KanchoNet
         // RIO 리소스 생성
         if (!CreateRIOResources())
         {
-            SocketUtils::CloseSocket(listenSocket_);
+            SocketUtils::CloseSocket(mListenSocket);
             SocketUtils::CleanupNetwork();
             return false;
         }
 
         // 소켓 바인드
-        if (!SocketUtils::BindSocket(listenSocket_, config_.port))
+        if (!SocketUtils::BindSocket(mListenSocket, mConfig.mPort))
         {
-            DeregisterBuffer(recvBufferInfo_);
-            DeregisterBuffer(sendBufferInfo_);
-            SocketUtils::CloseSocket(listenSocket_);
+            DeregisterBuffer(mRecvBufferInfo);
+            DeregisterBuffer(mSendBufferInfo);
+            SocketUtils::CloseSocket(mListenSocket);
             SocketUtils::CleanupNetwork();
             return false;
         }
 
         // 세션 매니저 생성
-        sessionManager_ = std::make_unique<SessionManager>(config_.maxSessions);
+        mSessionManager = std::make_unique<SessionManager>(mConfig.mMaxSessions);
 
-        initialized_ = true;
-        LOG_INFO("RIOModel initialized successfully. Port: %u", config_.port);
+        mInitialized = true;
+        LOG_INFO("RIOModel initialized successfully. Port: %u", mConfig.mPort);
         
         return true;
     }
 
     bool RIOModel::StartListen()
     {
-        if (!initialized_)
+        if (!mInitialized)
         {
             LOG_ERROR("RIOModel not initialized");
             return false;
         }
 
-        if (running_)
+        if (mRunning)
         {
             LOG_WARNING("RIOModel already running");
             return true;
         }
 
         // 리슨 시작
-        if (!SocketUtils::ListenSocket(listenSocket_, config_.backlog))
+        if (!SocketUtils::ListenSocket(mListenSocket, mConfig.mBacklog))
         {
             return false;
         }
 
-        running_ = true;
+        mRunning = true;
         LOG_INFO("RIOModel started listening");
         
         // Accept는 일반 소켓 API 사용 (RIO는 연결된 소켓에만 사용)
@@ -133,13 +133,13 @@ namespace KanchoNet
 
     bool RIOModel::ProcessIO(uint32_t timeoutMs)
     {
-        if (!running_)
+        if (!mRunning)
         {
             return false;
         }
 
         // Completion Queue에서 완료된 I/O 처리
-        ULONG numResults = rioFunctions_.RIODequeueCompletion(completionQueue_, nullptr, 0);
+        ULONG numResults = mRioFunctions.RIODequeueCompletion(mCompletionQueue, nullptr, 0);
         
         if (numResults == RIO_CORRUPT_CQ)
         {
@@ -150,7 +150,7 @@ namespace KanchoNet
         if (numResults == 0)
         {
             // 대기
-            DWORD waitResult = WaitForSingleObject((HANDLE)overlapped_.hEvent, timeoutMs);
+            DWORD waitResult = WaitForSingleObject((HANDLE)mOverlapped.hEvent, timeoutMs);
             if (waitResult == WAIT_TIMEOUT)
             {
                 return true; // 타임아웃은 에러가 아님
@@ -195,71 +195,71 @@ namespace KanchoNet
 
     void RIOModel::Shutdown()
     {
-        if (!initialized_)
+        if (!mInitialized)
         {
             return;
         }
 
-        running_ = false;
+        mRunning = false;
 
         // 세션 정리
-        if (sessionManager_)
+        if (mSessionManager)
         {
-            sessionManager_->ForEachSession([this](Session* session) {
+            mSessionManager->ForEachSession([this](Session* session) {
                 CloseSession(session);
             });
-            sessionManager_->Clear();
+            mSessionManager->Clear();
         }
 
         // RIO 리소스 정리
-        if (completionQueue_ != RIO_INVALID_CQ)
+        if (mCompletionQueue != RIO_INVALID_CQ)
         {
-            rioFunctions_.RIOCloseCompletionQueue(completionQueue_);
-            completionQueue_ = RIO_INVALID_CQ;
+            mRioFunctions.RIOCloseCompletionQueue(mCompletionQueue);
+            mCompletionQueue = RIO_INVALID_CQ;
         }
 
-        DeregisterBuffer(recvBufferInfo_);
-        DeregisterBuffer(sendBufferInfo_);
+        DeregisterBuffer(mRecvBufferInfo);
+        DeregisterBuffer(mSendBufferInfo);
 
         // 리슨 소켓 닫기
-        if (listenSocket_ != INVALID_SOCKET)
+        if (mListenSocket != INVALID_SOCKET)
         {
-            SocketUtils::CloseSocket(listenSocket_);
-            listenSocket_ = INVALID_SOCKET;
+            SocketUtils::CloseSocket(mListenSocket);
+            mListenSocket = INVALID_SOCKET;
         }
 
         // Winsock 정리
         SocketUtils::CleanupNetwork();
 
-        initialized_ = false;
+        mInitialized = false;
         LOG_INFO("RIOModel shutdown completed");
     }
 
     void RIOModel::SetAcceptCallback(std::function<void(Session*)> callback)
     {
-        onAccept_ = callback;
+        mOnAccept = callback;
     }
 
     void RIOModel::SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback)
     {
-        onReceive_ = callback;
+        mOnReceive = callback;
     }
 
     void RIOModel::SetDisconnectCallback(std::function<void(Session*)> callback)
     {
-        onDisconnect_ = callback;
+        mOnDisconnect = callback;
     }
 
     void RIOModel::SetErrorCallback(std::function<void(Session*, ErrorCode)> callback)
     {
-        onError_ = callback;
+        mOnError = callback;
     }
 
     bool RIOModel::IsRIOSupported() const
     {
-        if (rioSupportChecked_)
+        if (mRioSupportChecked)
         {
-            return rioSupported_;
+            return mRioSupported;
         }
 
         // Windows 버전 확인 (Windows 8 이상)
@@ -272,10 +272,10 @@ namespace KanchoNet
         VER_SET_CONDITION(conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
         VER_SET_CONDITION(conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
 
-        rioSupported_ = VerifyVersionInfo(&osvi, VER_MAJORVERSION | VER_MINORVERSION, conditionMask) != FALSE;
-        rioSupportChecked_ = true;
+        mRioSupported = VerifyVersionInfo(&osvi, VER_MAJORVERSION | VER_MINORVERSION, conditionMask) != FALSE;
+        mRioSupportChecked = true;
 
-        return rioSupported_;
+        return mRioSupported;
     }
 
     bool RIOModel::LoadRIOFunctions()
@@ -284,12 +284,12 @@ namespace KanchoNet
         DWORD bytes = 0;
 
         int result = WSAIoctl(
-            listenSocket_,
+            mListenSocket,
             SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER,
             &functionTableId,
             sizeof(functionTableId),
-            &rioFunctions_,
-            sizeof(rioFunctions_),
+            &mRioFunctions,
+            sizeof(mRioFunctions),
             &bytes,
             nullptr,
             nullptr
@@ -309,36 +309,36 @@ namespace KanchoNet
     {
         // Completion Queue 생성
         OVERLAPPED_ENTRY overlappedEntry = {};
-        overlappedEntry.lpOverlapped = &overlapped_;
-        overlapped_.hEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+        overlappedEntry.lpOverlapped = &mOverlapped;
+        mOverlapped.hEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
         RIO_NOTIFICATION_COMPLETION completionType = {};
         completionType.Type = RIO_EVENT_COMPLETION;
-        completionType.Event.EventHandle = overlapped_.hEvent;
+        completionType.Event.EventHandle = mOverlapped.hEvent;
         completionType.Event.NotifyReset = TRUE;
 
-        completionQueue_ = rioFunctions_.RIOCreateCompletionQueue(
-            config_.rioCQSize,
+        mCompletionQueue = mRioFunctions.RIOCreateCompletionQueue(
+            mConfig.mRioCQSize,
             &completionType
         );
 
-        if (completionQueue_ == RIO_INVALID_CQ)
+        if (mCompletionQueue == RIO_INVALID_CQ)
         {
             LOG_ERROR("Failed to create RIO Completion Queue. Error: %d", GetLastError());
             return false;
         }
 
         // 버퍼 등록
-        if (!RegisterBuffer(recvBufferInfo_, config_.recvBufferSize, config_.rioReceiveBufferCount))
+        if (!RegisterBuffer(mRecvBufferInfo, mConfig.mRecvBufferSize, mConfig.mRioReceiveBufferCount))
         {
             LOG_ERROR("Failed to register receive buffer");
             return false;
         }
 
-        if (!RegisterBuffer(sendBufferInfo_, config_.sendBufferSize, config_.rioSendBufferCount))
+        if (!RegisterBuffer(mSendBufferInfo, mConfig.mSendBufferSize, mConfig.mRioSendBufferCount))
         {
             LOG_ERROR("Failed to register send buffer");
-            DeregisterBuffer(recvBufferInfo_);
+            DeregisterBuffer(mRecvBufferInfo);
             return false;
         }
 
@@ -353,7 +353,7 @@ namespace KanchoNet
         bufferInfo.bufferSize = bufferSize;
         bufferInfo.bufferCount = bufferCount;
 
-        bufferInfo.bufferID = rioFunctions_.RIORegisterBuffer(
+        bufferInfo.bufferID = mRioFunctions.RIORegisterBuffer(
             (PCHAR)bufferInfo.buffer,
             static_cast<DWORD>(totalSize)
         );
@@ -373,7 +373,7 @@ namespace KanchoNet
     {
         if (bufferInfo.bufferID != RIO_INVALID_BUFFERID)
         {
-            rioFunctions_.RIODeregisterBuffer(bufferInfo.bufferID);
+            mRioFunctions.RIODeregisterBuffer(bufferInfo.bufferID);
             bufferInfo.bufferID = RIO_INVALID_BUFFERID;
         }
 
@@ -404,8 +404,8 @@ namespace KanchoNet
     {
         // Completion Queue에서 결과 처리
         std::vector<RIORESULT> results(128);
-        ULONG numResults = rioFunctions_.RIODequeueCompletion(
-            completionQueue_,
+        ULONG numResults = mRioFunctions.RIODequeueCompletion(
+            mCompletionQueue,
             results.data(),
             static_cast<ULONG>(results.size())
         );
@@ -441,7 +441,7 @@ namespace KanchoNet
         // Notify 재설정
         if (numResults > 0)
         {
-            rioFunctions_.RIONotify(completionQueue_);
+            mRioFunctions.RIONotify(mCompletionQueue);
         }
     }
 
@@ -460,7 +460,7 @@ namespace KanchoNet
         }
 
         // Receive 콜백 호출
-        if (onReceive_ && bytesTransferred > 0)
+        if (mOnReceive && bytesTransferred > 0)
         {
             // 실제로는 rioBuf에서 데이터를 읽어야 함
             LOG_WARNING("RIOModel::ProcessReceiveCompletion - Data handling not implemented");

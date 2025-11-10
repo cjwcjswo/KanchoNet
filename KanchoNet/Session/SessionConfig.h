@@ -7,13 +7,17 @@ namespace KanchoNet
     // 세션별 설정 구조체
     struct SessionConfig
     {
+    public:
+        // public 멤버변수
         // 타임아웃 설정
-        uint32_t receiveTimeoutMs = 60000;      // 수신 타임아웃 (기본 60초, 0 = 무한)
-        uint32_t sendTimeoutMs = 30000;         // 송신 타임아웃 (기본 30초, 0 = 무한)
+        uint32_t mReceiveTimeoutMs = 60000;      // 수신 타임아웃 (기본 60초, 0 = 무한)
+        uint32_t mSendTimeoutMs = 30000;         // 송신 타임아웃 (기본 30초, 0 = 무한)
         
         // 버퍼 설정
-        size_t maxPacketSize = 1024 * 1024;     // 최대 패킷 크기 (기본 1MB)
+        size_t mMaxPacketSize = 1024 * 1024;     // 최대 패킷 크기 (기본 1MB)
         
+    public:
+        // 생성자, 파괴자
         // 기본 생성자
         SessionConfig() = default;
         

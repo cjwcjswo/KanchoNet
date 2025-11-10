@@ -106,10 +106,10 @@ int main()
 {
     MyEchoServer server;
     KanchoNet::EngineConfig config;
-    config.port = 9000;
-    config.maxSessions = 1000;
-    config.noDelay = true;    // Nagle 알고리즘 비활성화
-    config.keepAlive = true;  // TCP Keep-Alive 활성화
+    config.mPort = 9000;
+    config.mMaxSessions = 1000;
+    config.mNoDelay = true;    // Nagle 알고리즘 비활성화
+    config.mKeepAlive = true;  // TCP Keep-Alive 활성화
     
     if (!server.Initialize(config))
     {
@@ -239,13 +239,13 @@ Examples/
 
 ```cpp
 KanchoNet::EngineConfig config;
-config.port = 9000;                  // 리슨 포트
-config.maxSessions = 10000;          // 최대 동시 접속 수
-config.backlog = 200;                // 리슨 백로그
-config.noDelay = true;               // TCP_NODELAY (Nagle 알고리즘)
-config.keepAlive = true;             // TCP Keep-Alive
-config.keepAliveTime = 10000;        // Keep-Alive 시간 (ms)
-config.keepAliveInterval = 3000;     // Keep-Alive 간격 (ms)
+config.mPort = 9000;                  // 리슨 포트
+config.mMaxSessions = 10000;          // 최대 동시 접속 수
+config.mBacklog = 200;                // 리슨 백로그
+config.mNoDelay = true;               // TCP_NODELAY (Nagle 알고리즘)
+config.mKeepAlive = true;             // TCP Keep-Alive
+config.mKeepAliveTime = 10000;        // Keep-Alive 시간 (ms)
+config.mKeepAliveInterval = 3000;     // Keep-Alive 간격 (ms)
 ```
 
 ## 문서

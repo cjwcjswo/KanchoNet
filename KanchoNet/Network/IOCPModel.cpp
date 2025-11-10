@@ -9,10 +9,10 @@
 namespace KanchoNet
 {
     IOCPModel::IOCPModel()
-        : initialized_(false)
-        , running_(false)
-        , listenSocket_(INVALID_SOCKET)
-        , iocpHandle_(nullptr)
+        : mInitialized(false)
+        , mRunning(false)
+        , mListenSocket(INVALID_SOCKET)
+        , mIocpHandle(nullptr)
     {
     }
 
@@ -23,13 +23,13 @@ namespace KanchoNet
 
     bool IOCPModel::Initialize(const EngineConfig& config)
     {
-        if (initialized_)
+        if (mInitialized)
         {
             LOG_ERROR("IOCPModel already initialized");
             return false;
         }
 
-        config_ = config;
+        mConfig = config;
 
         // Winsock 초기화
         if (!SocketUtils::InitializeNetwork())
@@ -45,66 +45,66 @@ namespace KanchoNet
         }
 
         // 리슨 소켓 생성
-        listenSocket_ = SocketUtils::CreateTCPSocket();
-        if (listenSocket_ == INVALID_SOCKET)
+        mListenSocket = SocketUtils::CreateTCPSocket();
+        if (mListenSocket == INVALID_SOCKET)
         {
-            CloseHandle(iocpHandle_);
+            CloseHandle(mIocpHandle);
             SocketUtils::CleanupNetwork();
             return false;
         }
 
         // 소켓 옵션 설정
-        SocketUtils::SetSocketOption(listenSocket_, config_);
+        SocketUtils::SetSocketOption(mListenSocket, mConfig);
 
         // Extension Functions 로드
-        if (!SocketUtils::LoadExtensionFunctions(listenSocket_))
+        if (!SocketUtils::LoadExtensionFunctions(mListenSocket))
         {
-            SocketUtils::CloseSocket(listenSocket_);
-            CloseHandle(iocpHandle_);
+            SocketUtils::CloseSocket(mListenSocket);
+            CloseHandle(mIocpHandle);
             SocketUtils::CleanupNetwork();
             return false;
         }
 
         // 소켓 바인드
-        if (!SocketUtils::BindSocket(listenSocket_, config_.port))
+        if (!SocketUtils::BindSocket(mListenSocket, mConfig.mPort))
         {
-            SocketUtils::CloseSocket(listenSocket_);
-            CloseHandle(iocpHandle_);
+            SocketUtils::CloseSocket(mListenSocket);
+            CloseHandle(mIocpHandle);
             SocketUtils::CleanupNetwork();
             return false;
         }
 
         // 세션 매니저 생성
-        sessionManager_ = std::make_unique<SessionManager>(config_.maxSessions);
+        mSessionManager = std::make_unique<SessionManager>(mConfig.mMaxSessions);
 
-        initialized_ = true;
-        LOG_INFO("IOCPModel initialized successfully. Port: %u", config_.port);
+        mInitialized = true;
+        LOG_INFO("IOCPModel initialized successfully. Port: %u", mConfig.mPort);
         
         return true;
     }
 
     bool IOCPModel::StartListen()
     {
-        if (!initialized_)
+        if (!mInitialized)
         {
             LOG_ERROR("IOCPModel not initialized");
             return false;
         }
 
-        if (running_)
+        if (mRunning)
         {
             LOG_WARNING("IOCPModel already running");
             return true;
         }
 
         // 리슨 시작
-        if (!SocketUtils::ListenSocket(listenSocket_, config_.backlog))
+        if (!SocketUtils::ListenSocket(mListenSocket, mConfig.mBacklog))
         {
             return false;
         }
 
         // IOCP에 리슨 소켓 등록
-        HANDLE result = CreateIoCompletionPort((HANDLE)listenSocket_, iocpHandle_, 
+        HANDLE result = CreateIoCompletionPort((HANDLE)mListenSocket, mIocpHandle, 
                                                (ULONG_PTR)nullptr, 0);
         if (result == nullptr)
         {
@@ -119,7 +119,7 @@ namespace KanchoNet
             return false;
         }
 
-        running_ = true;
+        mRunning = true;
         LOG_INFO("IOCPModel started listening");
         
         return true;
@@ -127,7 +127,7 @@ namespace KanchoNet
 
     bool IOCPModel::ProcessIO(uint32_t timeoutMs)
     {
-        if (!running_)
+        if (!mRunning)
         {
             return false;
         }
@@ -137,7 +137,7 @@ namespace KanchoNet
         OVERLAPPED* overlapped = nullptr;
 
         BOOL result = GetQueuedCompletionStatus(
-            iocpHandle_,
+            mIocpHandle,
             &bytesTransferred,
             &completionKey,
             &overlapped,
@@ -225,67 +225,67 @@ namespace KanchoNet
 
     void IOCPModel::Shutdown()
     {
-        if (!initialized_)
+        if (!mInitialized)
         {
             return;
         }
 
-        running_ = false;
+        mRunning = false;
 
         // 세션 정리
-        if (sessionManager_)
+        if (mSessionManager)
         {
-            sessionManager_->ForEachSession([this](Session* session) {
+            mSessionManager->ForEachSession([this](Session* session) {
                 CloseSession(session);
             });
-            sessionManager_->Clear();
+            mSessionManager->Clear();
         }
 
         // 리슨 소켓 닫기
-        if (listenSocket_ != INVALID_SOCKET)
+        if (mListenSocket != INVALID_SOCKET)
         {
-            SocketUtils::CloseSocket(listenSocket_);
-            listenSocket_ = INVALID_SOCKET;
+            SocketUtils::CloseSocket(mListenSocket);
+            mListenSocket = INVALID_SOCKET;
         }
 
         // IOCP 핸들 닫기
-        if (iocpHandle_ != nullptr)
+        if (mIocpHandle != nullptr)
         {
-            CloseHandle(iocpHandle_);
-            iocpHandle_ = nullptr;
+            CloseHandle(mIocpHandle);
+            mIocpHandle = nullptr;
         }
 
         // Winsock 정리
         SocketUtils::CleanupNetwork();
 
-        initialized_ = false;
+        mInitialized = false;
         LOG_INFO("IOCPModel shutdown completed");
     }
 
     void IOCPModel::SetAcceptCallback(std::function<void(Session*)> callback)
     {
-        onAccept_ = callback;
+        mOnAccept = callback;
     }
 
     void IOCPModel::SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback)
     {
-        onReceive_ = callback;
+        mOnReceive = callback;
     }
 
     void IOCPModel::SetDisconnectCallback(std::function<void(Session*)> callback)
     {
-        onDisconnect_ = callback;
+        mOnDisconnect = callback;
     }
 
     void IOCPModel::SetErrorCallback(std::function<void(Session*, ErrorCode)> callback)
     {
-        onError_ = callback;
+        mOnError = callback;
     }
 
     bool IOCPModel::CreateIOCP()
     {
-        iocpHandle_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
-        if (iocpHandle_ == nullptr)
+        mIocpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
+        if (mIocpHandle == nullptr)
         {
             LOG_ERROR("Failed to create IOCP. Error: %d", GetLastError());
             return false;
@@ -311,7 +311,7 @@ namespace KanchoNet
 
         DWORD bytes = 0;
         BOOL result = SocketUtils::GetAcceptEx()(
-            listenSocket_,
+            mListenSocket,
             context->acceptSocket,
             context->buffer,
             0, // 데이터를 기다리지 않음
@@ -339,7 +339,7 @@ namespace KanchoNet
 
         // 세션 생성
         SessionConfig sessionConfig;
-        Session* session = sessionManager_->AddSession(context->acceptSocket, sessionConfig);
+        Session* session = mSessionManager->AddSession(context->acceptSocket, sessionConfig);
         if (!session)
         {
             LOG_WARNING("Failed to add session. Session limit reached.");
@@ -352,7 +352,7 @@ namespace KanchoNet
         // IOCP에 클라이언트 소켓 등록
         HANDLE result = CreateIoCompletionPort(
             (HANDLE)context->acceptSocket,
-            iocpHandle_,
+            mIocpHandle,
             (ULONG_PTR)session,
             0
         );
@@ -372,9 +372,9 @@ namespace KanchoNet
         }
 
         // Accept 콜백 호출
-        if (onAccept_)
+        if (mOnAccept)
         {
-            onAccept_(session);
+            mOnAccept(session);
         }
 
         LOG_DEBUG("Client accepted. SessionID: %llu", session->GetID());
@@ -389,9 +389,9 @@ namespace KanchoNet
         }
 
         // Receive 콜백 호출
-        if (onReceive_)
+        if (mOnReceive)
         {
-            onReceive_(session, context->buffer, bytesTransferred);
+            mOnReceive(session, context->buffer, bytesTransferred);
         }
 
         // 다음 수신 등록
@@ -438,15 +438,15 @@ namespace KanchoNet
         session->SetState(SessionState::Disconnected);
 
         // Disconnect 콜백 호출
-        if (onDisconnect_)
+        if (mOnDisconnect)
         {
-            onDisconnect_(session);
+            mOnDisconnect(session);
         }
 
         LOG_DEBUG("Client disconnected. SessionID: %llu", session->GetID());
 
         // 세션 제거
-        sessionManager_->RemoveSession(session->GetID());
+        mSessionManager->RemoveSession(session->GetID());
     }
 
     bool IOCPModel::PostReceive(Session* session)

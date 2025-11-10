@@ -12,13 +12,26 @@ namespace KanchoNet
     class RingBuffer : public NonCopyable
     {
     public:
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+        std::vector<uint8_t> mBuffer;
+        size_t mCapacity;
+        size_t mReadPos;
+        size_t mWritePos;
+        
+    public:
+        // 생성자, 파괴자
         explicit RingBuffer(size_t capacity);
         ~RingBuffer();
 
         // 이동 생성자/대입 연산자
         RingBuffer(RingBuffer&& other) noexcept;
         RingBuffer& operator=(RingBuffer&& other) noexcept;
-
+        
+    public:
+        // public 함수
         // 데이터 쓰기
         size_t Write(const void* data, size_t size);
         
@@ -32,28 +45,22 @@ namespace KanchoNet
         size_t Skip(size_t size);
         
         // 버퍼 상태
-        size_t GetCapacity() const { return capacity_; }
+        size_t GetCapacity() const { return mCapacity; }
         size_t GetAvailableRead() const;  // 읽을 수 있는 데이터 크기
         size_t GetAvailableWrite() const; // 쓸 수 있는 여유 공간
-        bool IsEmpty() const { return readPos_ == writePos_; }
+        bool IsEmpty() const { return mReadPos == mWritePos; }
         bool IsFull() const { return GetAvailableWrite() == 0; }
         
         // 버퍼 초기화
         void Clear();
         
         // 직접 메모리 접근 (고급 사용)
-        uint8_t* GetWritePtr() { return buffer_.data() + writePos_; }
-        const uint8_t* GetReadPtr() const { return buffer_.data() + readPos_; }
+        uint8_t* GetWritePtr() { return mBuffer.data() + mWritePos; }
+        const uint8_t* GetReadPtr() const { return mBuffer.data() + mReadPos; }
         size_t GetContiguousWriteSize() const; // 연속된 쓰기 가능 크기
         size_t GetContiguousReadSize() const;  // 연속된 읽기 가능 크기
         void CommitWrite(size_t size);         // 쓰기 완료 알림
         void CommitRead(size_t size);          // 읽기 완료 알림
-
-    private:
-        std::vector<uint8_t> buffer_;
-        size_t capacity_;
-        size_t readPos_;
-        size_t writePos_;
     };
 
 } // namespace KanchoNet

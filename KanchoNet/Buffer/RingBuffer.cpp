@@ -4,11 +4,11 @@
 namespace KanchoNet
 {
     RingBuffer::RingBuffer(size_t capacity)
-        : capacity_(capacity + 1) // +1 for distinguishing full from empty
-        , readPos_(0)
-        , writePos_(0)
+        : mCapacity(capacity + 1) // +1 for distinguishing full from empty
+        , mReadPos(0)
+        , mWritePos(0)
     {
-        buffer_.resize(capacity_);
+        mBuffer.resize(mCapacity);
     }
 
     RingBuffer::~RingBuffer()
@@ -16,28 +16,28 @@ namespace KanchoNet
     }
 
     RingBuffer::RingBuffer(RingBuffer&& other) noexcept
-        : buffer_(std::move(other.buffer_))
-        , capacity_(other.capacity_)
-        , readPos_(other.readPos_)
-        , writePos_(other.writePos_)
+        : mBuffer(std::move(other.mBuffer))
+        , mCapacity(other.mCapacity)
+        , mReadPos(other.mReadPos)
+        , mWritePos(other.mWritePos)
     {
-        other.capacity_ = 0;
-        other.readPos_ = 0;
-        other.writePos_ = 0;
+        other.mCapacity = 0;
+        other.mReadPos = 0;
+        other.mWritePos = 0;
     }
 
     RingBuffer& RingBuffer::operator=(RingBuffer&& other) noexcept
     {
         if (this != &other)
         {
-            buffer_ = std::move(other.buffer_);
-            capacity_ = other.capacity_;
-            readPos_ = other.readPos_;
-            writePos_ = other.writePos_;
+            mBuffer = std::move(other.mBuffer);
+            mCapacity = other.mCapacity;
+            mReadPos = other.mReadPos;
+            mWritePos = other.mWritePos;
             
-            other.capacity_ = 0;
-            other.readPos_ = 0;
-            other.writePos_ = 0;
+            other.mCapacity = 0;
+            other.mReadPos = 0;
+            other.mWritePos = 0;
         }
         return *this;
     }
@@ -59,15 +59,15 @@ namespace KanchoNet
         size_t contiguousSize = GetContiguousWriteSize();
         if (writeSize <= contiguousSize)
         {
-            std::memcpy(buffer_.data() + writePos_, src, writeSize);
-            writePos_ = (writePos_ + writeSize) % capacity_;
+            std::memcpy(mBuffer.data() + mWritePos, src, writeSize);
+            mWritePos = (mWritePos + writeSize) % mCapacity;
         }
         else
         {
             // 두 번에 나눠서 쓰기 (순환)
-            std::memcpy(buffer_.data() + writePos_, src, contiguousSize);
-            std::memcpy(buffer_.data(), src + contiguousSize, writeSize - contiguousSize);
-            writePos_ = writeSize - contiguousSize;
+            std::memcpy(mBuffer.data() + mWritePos, src, contiguousSize);
+            std::memcpy(mBuffer.data(), src + contiguousSize, writeSize - contiguousSize);
+            mWritePos = writeSize - contiguousSize;
         }
 
         return writeSize;
@@ -78,7 +78,7 @@ namespace KanchoNet
         size_t readSize = Peek(buffer, size);
         if (readSize > 0)
         {
-            readPos_ = (readPos_ + readSize) % capacity_;
+            mReadPos = (mReadPos + readSize) % mCapacity;
         }
         return readSize;
     }
@@ -100,13 +100,13 @@ namespace KanchoNet
         size_t contiguousSize = GetContiguousReadSize();
         if (peekSize <= contiguousSize)
         {
-            std::memcpy(dest, buffer_.data() + readPos_, peekSize);
+            std::memcpy(dest, mBuffer.data() + mReadPos, peekSize);
         }
         else
         {
             // 두 번에 나눠서 읽기 (순환)
-            std::memcpy(dest, buffer_.data() + readPos_, contiguousSize);
-            std::memcpy(dest + contiguousSize, buffer_.data(), peekSize - contiguousSize);
+            std::memcpy(dest, mBuffer.data() + mReadPos, contiguousSize);
+            std::memcpy(dest + contiguousSize, mBuffer.data(), peekSize - contiguousSize);
         }
 
         return peekSize;
@@ -119,7 +119,7 @@ namespace KanchoNet
         
         if (skipSize > 0)
         {
-            readPos_ = (readPos_ + skipSize) % capacity_;
+            mReadPos = (mReadPos + skipSize) % mCapacity;
         }
         
         return skipSize;
@@ -127,51 +127,51 @@ namespace KanchoNet
 
     size_t RingBuffer::GetAvailableRead() const
     {
-        if (writePos_ >= readPos_)
+        if (mWritePos >= mReadPos)
         {
-            return writePos_ - readPos_;
+            return mWritePos - mReadPos;
         }
         else
         {
-            return capacity_ - readPos_ + writePos_;
+            return mCapacity - mReadPos + mWritePos;
         }
     }
 
     size_t RingBuffer::GetAvailableWrite() const
     {
-        return capacity_ - 1 - GetAvailableRead();
+        return mCapacity - 1 - GetAvailableRead();
     }
 
     void RingBuffer::Clear()
     {
-        readPos_ = 0;
-        writePos_ = 0;
+        mReadPos = 0;
+        mWritePos = 0;
     }
 
     size_t RingBuffer::GetContiguousWriteSize() const
     {
-        if (writePos_ >= readPos_)
+        if (mWritePos >= mReadPos)
         {
-            size_t toEnd = capacity_ - writePos_;
-            if (readPos_ == 0)
+            size_t toEnd = mCapacity - mWritePos;
+            if (mReadPos == 0)
                 return toEnd - 1; // 버퍼가 꽉 찼는지 구분하기 위해 -1
             return toEnd;
         }
         else
         {
-            return readPos_ - writePos_ - 1;
+            return mReadPos - mWritePos - 1;
         }
     }
 
     size_t RingBuffer::GetContiguousReadSize() const
     {
-        if (writePos_ >= readPos_)
+        if (mWritePos >= mReadPos)
         {
-            return writePos_ - readPos_;
+            return mWritePos - mReadPos;
         }
         else
         {
-            return capacity_ - readPos_;
+            return mCapacity - mReadPos;
         }
     }
 
@@ -179,14 +179,14 @@ namespace KanchoNet
     {
         size_t availableWrite = GetAvailableWrite();
         size_t commitSize = (std::min)(size, availableWrite);
-        writePos_ = (writePos_ + commitSize) % capacity_;
+        mWritePos = (mWritePos + commitSize) % mCapacity;
     }
 
     void RingBuffer::CommitRead(size_t size)
     {
         size_t availableRead = GetAvailableRead();
         size_t commitSize = (std::min)(size, availableRead);
-        readPos_ = (readPos_ + commitSize) % capacity_;
+        mReadPos = (mReadPos + commitSize) % mCapacity;
     }
 
 } // namespace KanchoNet

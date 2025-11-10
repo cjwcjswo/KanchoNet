@@ -9,16 +9,16 @@
 
 namespace KanchoNet
 {
-    bool IOUringModel::iouringSupportChecked_ = false;
-    bool IOUringModel::iouringSupported_ = false;
+    bool IOUringModel::mIOUringSupportChecked = false;
+    bool IOUringModel::mIOUringSupported = false;
 
     IOUringModel::IOUringModel()
-        : initialized_(false)
-        , running_(false)
-        , listenSocket_(INVALID_SOCKET_HANDLE)
-        , ringInitialized_(false)
+        : mInitialized(false)
+        , mRunning(false)
+        , mListenSocket(INVALID_SOCKET_HANDLE)
+        , mRingInitialized(false)
     {
-        memset(&ring_, 0, sizeof(ring_));
+        memset(&mRing, 0, sizeof(mRing));
     }
 
     IOUringModel::~IOUringModel()
@@ -28,7 +28,7 @@ namespace KanchoNet
 
     bool IOUringModel::Initialize(const EngineConfig& config)
     {
-        if (initialized_)
+        if (mInitialized)
         {
             LOG_ERROR("IOUringModel already initialized");
             return false;
@@ -38,14 +38,14 @@ namespace KanchoNet
         if (!IsIOUringSupported())
         {
             LOG_ERROR("io_uring is not supported on this system (requires Linux kernel 5.1+)");
-            if (onError_)
+            if (mOnError)
             {
-                onError_(nullptr, ErrorCode::IOUringNotSupported);
+                mOnError(nullptr, ErrorCode::IOUringNotSupported);
             }
             return false;
         }
 
-        config_ = config;
+        mConfig = config;
 
         // 네트워크 초기화
         if (!SocketUtils::InitializeNetwork())
@@ -61,52 +61,52 @@ namespace KanchoNet
         }
 
         // 리슨 소켓 생성
-        listenSocket_ = SocketUtils::CreateTCPSocket();
-        if (listenSocket_ == INVALID_SOCKET_HANDLE)
+        mListenSocket = SocketUtils::CreateTCPSocket();
+        if (mListenSocket == INVALID_SOCKET_HANDLE)
         {
-            io_uring_queue_exit(&ring_);
+            io_uring_queue_exit(&mRing);
             SocketUtils::CleanupNetwork();
             return false;
         }
 
         // 소켓 옵션 설정
-        SocketUtils::SetSocketOption(listenSocket_, config_);
-        SocketUtils::SetNonBlocking(listenSocket_, true);
+        SocketUtils::SetSocketOption(mListenSocket, mConfig);
+        SocketUtils::SetNonBlocking(mListenSocket, true);
 
         // 소켓 바인드
-        if (!SocketUtils::BindSocket(listenSocket_, config_.port))
+        if (!SocketUtils::BindSocket(mListenSocket, mConfig.mPort))
         {
-            SocketUtils::CloseSocket(listenSocket_);
-            io_uring_queue_exit(&ring_);
+            SocketUtils::CloseSocket(mListenSocket);
+            io_uring_queue_exit(&mRing);
             SocketUtils::CleanupNetwork();
             return false;
         }
 
         // 세션 매니저 생성
-        sessionManager_ = std::make_unique<SessionManager>(config_.maxSessions);
+        mSessionManager = std::make_unique<SessionManager>(mConfig.mMaxSessions);
 
-        initialized_ = true;
-        LOG_INFO("IOUringModel initialized successfully. Port: %u", config_.port);
+        mInitialized = true;
+        LOG_INFO("IOUringModel initialized successfully. Port: %u", mConfig.mPort);
         
         return true;
     }
 
     bool IOUringModel::StartListen()
     {
-        if (!initialized_)
+        if (!mInitialized)
         {
             LOG_ERROR("IOUringModel not initialized");
             return false;
         }
 
-        if (running_)
+        if (mRunning)
         {
             LOG_WARNING("IOUringModel already running");
             return true;
         }
 
         // 리슨 시작
-        if (!SocketUtils::ListenSocket(listenSocket_, config_.backlog))
+        if (!SocketUtils::ListenSocket(mListenSocket, mConfig.mBacklog))
         {
             return false;
         }
@@ -117,7 +117,7 @@ namespace KanchoNet
             return false;
         }
 
-        running_ = true;
+        mRunning = true;
         LOG_INFO("IOUringModel started listening");
         
         return true;
@@ -125,7 +125,7 @@ namespace KanchoNet
 
     bool IOUringModel::ProcessIO(uint32_t timeoutMs)
     {
-        if (!running_)
+        if (!mRunning)
         {
             return false;
         }
@@ -139,11 +139,11 @@ namespace KanchoNet
 
         if (timeoutMs > 0)
         {
-            ret = io_uring_wait_cqe_timeout(&ring_, &cqe, &ts);
+            ret = io_uring_wait_cqe_timeout(&mRing, &cqe, &ts);
         }
         else
         {
-            ret = io_uring_peek_cqe(&ring_, &cqe);
+            ret = io_uring_peek_cqe(&mRing, &cqe);
         }
 
         if (ret < 0)
@@ -160,16 +160,16 @@ namespace KanchoNet
         unsigned head;
         unsigned count = 0;
         
-        io_uring_for_each_cqe(&ring_, head, cqe)
+        io_uring_for_each_cqe(&mRing, head, cqe)
         {
             ++count;
             ProcessCompletion(cqe);
-            io_uring_cqe_seen(&ring_, cqe);
+            io_uring_cqe_seen(&mRing, cqe);
         }
 
         if (count > 0)
         {
-            io_uring_cq_advance(&ring_, count);
+            io_uring_cq_advance(&mRing, count);
         }
 
         return true;
@@ -204,70 +204,70 @@ namespace KanchoNet
 
     void IOUringModel::Shutdown()
     {
-        if (!initialized_)
+        if (!mInitialized)
         {
             return;
         }
 
-        running_ = false;
+        mRunning = false;
 
         // 세션 정리
-        if (sessionManager_)
+        if (mSessionManager)
         {
-            sessionManager_->ForEachSession([this](Session* session) {
+            mSessionManager->ForEachSession([this](Session* session) {
                 CloseSession(session);
             });
-            sessionManager_->Clear();
+            mSessionManager->Clear();
         }
 
-        socketToSession_.clear();
+        mSocketToSession.clear();
 
         // 리슨 소켓 닫기
-        if (listenSocket_ != INVALID_SOCKET_HANDLE)
+        if (mListenSocket != INVALID_SOCKET_HANDLE)
         {
-            SocketUtils::CloseSocket(listenSocket_);
-            listenSocket_ = INVALID_SOCKET_HANDLE;
+            SocketUtils::CloseSocket(mListenSocket);
+            mListenSocket = INVALID_SOCKET_HANDLE;
         }
 
         // io_uring 정리
-        if (ringInitialized_)
+        if (mRingInitialized)
         {
-            io_uring_queue_exit(&ring_);
-            ringInitialized_ = false;
+            io_uring_queue_exit(&mRing);
+            mRingInitialized = false;
         }
 
         // 네트워크 정리
         SocketUtils::CleanupNetwork();
 
-        initialized_ = false;
+        mInitialized = false;
         LOG_INFO("IOUringModel shutdown completed");
     }
 
     void IOUringModel::SetAcceptCallback(std::function<void(Session*)> callback)
     {
-        onAccept_ = callback;
+        mOnAccept = callback;
     }
 
     void IOUringModel::SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback)
     {
-        onReceive_ = callback;
+        mOnReceive = callback;
     }
 
     void IOUringModel::SetDisconnectCallback(std::function<void(Session*)> callback)
     {
-        onDisconnect_ = callback;
+        mOnDisconnect = callback;
     }
 
     void IOUringModel::SetErrorCallback(std::function<void(Session*, ErrorCode)> callback)
     {
-        onError_ = callback;
+        mOnError = callback;
     }
 
     bool IOUringModel::IsIOUringSupported()
     {
-        if (iouringSupportChecked_)
+        if (mIOUringSupportChecked)
         {
-            return iouringSupported_;
+            return mIOUringSupported;
         }
 
         // io_uring 지원 여부 확인
@@ -277,35 +277,35 @@ namespace KanchoNet
         if (ret == 0)
         {
             io_uring_queue_exit(&testRing);
-            iouringSupported_ = true;
+            mIOUringSupported = true;
         }
         else
         {
-            iouringSupported_ = false;
+            mIOUringSupported = false;
         }
 
-        iouringSupportChecked_ = true;
-        return iouringSupported_;
+        mIOUringSupportChecked = true;
+        return mIOUringSupported;
     }
 
     bool IOUringModel::CreateIOUring()
     {
         // io_uring 초기화 (queue depth: 256)
-        int ret = io_uring_queue_init(256, &ring_, 0);
+        int ret = io_uring_queue_init(256, &mRing, 0);
         if (ret < 0)
         {
             LOG_ERROR("Failed to initialize io_uring. Error: %d", -ret);
             return false;
         }
 
-        ringInitialized_ = true;
+        mRingInitialized = true;
         LOG_INFO("io_uring initialized successfully");
         return true;
     }
 
     bool IOUringModel::SubmitAccept()
     {
-        struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+        struct io_uring_sqe* sqe = io_uring_get_sqe(&mRing);
         if (!sqe)
         {
             LOG_ERROR("Failed to get SQE for accept");
@@ -321,10 +321,10 @@ namespace KanchoNet
         struct sockaddr_in clientAddr;
         socklen_t addrLen = sizeof(clientAddr);
 
-        io_uring_prep_accept(sqe, listenSocket_, (struct sockaddr*)&clientAddr, &addrLen, 0);
+        io_uring_prep_accept(sqe, mListenSocket, (struct sockaddr*)&clientAddr, &addrLen, 0);
         io_uring_sqe_set_data(sqe, ctx);
 
-        int ret = io_uring_submit(&ring_);
+        int ret = io_uring_submit(&mRing);
         if (ret < 0)
         {
             LOG_ERROR("Failed to submit accept. Error: %d", -ret);
@@ -337,7 +337,7 @@ namespace KanchoNet
 
     bool IOUringModel::SubmitReceive(Session* session)
     {
-        struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+        struct io_uring_sqe* sqe = io_uring_get_sqe(&mRing);
         if (!sqe)
         {
             LOG_ERROR("Failed to get SQE for receive");
@@ -353,7 +353,7 @@ namespace KanchoNet
         io_uring_prep_recv(sqe, session->GetSocket(), ctx->buffer, ctx->bufferSize, 0);
         io_uring_sqe_set_data(sqe, ctx);
 
-        int ret = io_uring_submit(&ring_);
+        int ret = io_uring_submit(&mRing);
         if (ret < 0)
         {
             LOG_ERROR("Failed to submit receive. Error: %d", -ret);
@@ -377,7 +377,7 @@ namespace KanchoNet
             return true;
         }
 
-        struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+        struct io_uring_sqe* sqe = io_uring_get_sqe(&mRing);
         if (!sqe)
         {
             LOG_ERROR("Failed to get SQE for send");
@@ -396,7 +396,7 @@ namespace KanchoNet
         io_uring_prep_send(sqe, session->GetSocket(), ctx->buffer, ctx->bufferSize, 0);
         io_uring_sqe_set_data(sqe, ctx);
 
-        int ret = io_uring_submit(&ring_);
+        int ret = io_uring_submit(&mRing);
         if (ret < 0)
         {
             LOG_ERROR("Failed to submit send. Error: %d", -ret);
@@ -458,7 +458,7 @@ namespace KanchoNet
 
         // 세션 생성
         SessionConfig sessionConfig;
-        Session* session = sessionManager_->AddSession(clientSocket, sessionConfig);
+        Session* session = mSessionManager->AddSession(clientSocket, sessionConfig);
         if (!session)
         {
             LOG_WARNING("Failed to add session. Session limit reached.");
@@ -467,7 +467,7 @@ namespace KanchoNet
         }
 
         session->SetState(SessionState::Connected);
-        socketToSession_[clientSocket] = session;
+        mSocketToSession[clientSocket] = session;
 
         // 수신 시작
         if (!SubmitReceive(session))
@@ -477,9 +477,9 @@ namespace KanchoNet
         }
 
         // Accept 콜백 호출
-        if (onAccept_)
+        if (mOnAccept)
         {
-            onAccept_(session);
+            mOnAccept(session);
         }
 
         LOG_DEBUG("Client accepted. SessionID: %llu", session->GetID());
@@ -496,9 +496,9 @@ namespace KanchoNet
         if (result > 0)
         {
             // 데이터 수신 성공
-            if (onReceive_)
+            if (mOnReceive)
             {
-                onReceive_(session, ctx->buffer, result);
+                mOnReceive(session, ctx->buffer, result);
             }
 
             // 다음 수신 등록
@@ -568,20 +568,20 @@ namespace KanchoNet
         session->SetState(SessionState::Disconnected);
 
         // Disconnect 콜백 호출
-        if (onDisconnect_)
+        if (mOnDisconnect)
         {
-            onDisconnect_(session);
+            mOnDisconnect(session);
         }
 
         LOG_DEBUG("Client disconnected. SessionID: %llu", session->GetID());
 
         // 소켓 제거
         SocketHandle socket = session->GetSocket();
-        socketToSession_.erase(socket);
+        mSocketToSession.erase(socket);
         SocketUtils::CloseSocket(socket);
 
         // 세션 제거
-        sessionManager_->RemoveSession(session->GetID());
+        mSessionManager->RemoveSession(session->GetID());
     }
 
     void IOUringModel::CloseSession(Session* session)
@@ -592,7 +592,7 @@ namespace KanchoNet
         }
 
         SocketHandle socket = session->GetSocket();
-        socketToSession_.erase(socket);
+        mSocketToSession.erase(socket);
         SocketUtils::ShutdownSocket(socket);
         SocketUtils::CloseSocket(socket);
     }

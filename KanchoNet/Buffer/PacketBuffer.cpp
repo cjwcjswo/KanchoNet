@@ -4,30 +4,30 @@
 namespace KanchoNet
 {
     PacketBuffer::PacketBuffer()
-        : size_(0)
+        : mSize(0)
     {
-        data_.reserve(DEFAULT_BUFFER_SIZE);
+        mData.reserve(DEFAULT_BUFFER_SIZE);
     }
 
     PacketBuffer::PacketBuffer(size_t initialCapacity)
-        : size_(0)
+        : mSize(0)
     {
-        data_.reserve(initialCapacity);
+        mData.reserve(initialCapacity);
     }
 
     PacketBuffer::PacketBuffer(const void* data, size_t size)
-        : size_(size)
+        : mSize(size)
     {
-        data_.resize(size);
+        mData.resize(size);
         if (data && size > 0)
         {
-            std::memcpy(data_.data(), data, size);
+            std::memcpy(mData.data(), data, size);
         }
     }
 
     PacketBuffer::PacketBuffer(const PacketBuffer& other)
-        : data_(other.data_)
-        , size_(other.size_)
+        : mData(other.mData)
+        , mSize(other.mSize)
     {
     }
 
@@ -35,26 +35,26 @@ namespace KanchoNet
     {
         if (this != &other)
         {
-            data_ = other.data_;
-            size_ = other.size_;
+            mData = other.mData;
+            mSize = other.mSize;
         }
         return *this;
     }
 
     PacketBuffer::PacketBuffer(PacketBuffer&& other) noexcept
-        : data_(std::move(other.data_))
-        , size_(other.size_)
+        : mData(std::move(other.mData))
+        , mSize(other.mSize)
     {
-        other.size_ = 0;
+        other.mSize = 0;
     }
 
     PacketBuffer& PacketBuffer::operator=(PacketBuffer&& other) noexcept
     {
         if (this != &other)
         {
-            data_ = std::move(other.data_);
-            size_ = other.size_;
-            other.size_ = 0;
+            mData = std::move(other.mData);
+            mSize = other.mSize;
+            other.mSize = 0;
         }
         return *this;
     }
@@ -65,19 +65,19 @@ namespace KanchoNet
 
     void PacketBuffer::Clear()
     {
-        size_ = 0;
+        mSize = 0;
         // capacity는 유지하여 재사용 가능하게 함
     }
 
     void PacketBuffer::Reserve(size_t capacity)
     {
-        data_.reserve(capacity);
+        mData.reserve(capacity);
     }
 
     void PacketBuffer::Resize(size_t newSize)
     {
-        data_.resize(newSize);
-        size_ = newSize;
+        mData.resize(newSize);
+        mSize = newSize;
     }
 
     void PacketBuffer::Append(const void* data, size_t size)
@@ -85,15 +85,15 @@ namespace KanchoNet
         if (data == nullptr || size == 0)
             return;
 
-        size_t newSize = size_ + size;
-        if (newSize > data_.capacity())
+        size_t newSize = mSize + size;
+        if (newSize > mData.capacity())
         {
-            data_.reserve(newSize * 2); // 2배 증가 전략
+            mData.reserve(newSize * 2); // 2배 증가 전략
         }
         
-        data_.resize(newSize);
-        std::memcpy(data_.data() + size_, data, size);
-        size_ = newSize;
+        mData.resize(newSize);
+        std::memcpy(mData.data() + mSize, data, size);
+        mSize = newSize;
     }
 
     void PacketBuffer::Append(const PacketBuffer& other)
@@ -109,9 +109,9 @@ namespace KanchoNet
         Clear();
         if (data && size > 0)
         {
-            data_.resize(size);
-            std::memcpy(data_.data(), data, size);
-            size_ = size;
+            mData.resize(size);
+            std::memcpy(mData.data(), data, size);
+            mSize = size;
         }
     }
 

@@ -4,24 +4,13 @@
 #include "../Core/EngineConfig.h"
 #include "../Session/Session.h"
 #include "../Buffer/PacketBuffer.h"
+#include <functional>
 
 namespace KanchoNet
 {
-    // 네트워크 모델 인터페이스 (IOCP와 RIO의 공통 인터페이스)
-    // 템플릿 파라미터로 사용되므로 순수 가상 함수가 아닌 개념(Concept) 형태
-    // 
-    // 요구사항:
-    // - bool Initialize(const EngineConfig& config)
-    // - bool StartListen()
-    // - bool ProcessIO(uint32_t timeoutMs = 0)
-    // - bool Send(Session* session, const PacketBuffer& buffer)
-    // - void Shutdown()
-    // - void SetAcceptCallback(std::function<void(Session*)> callback)
-    // - void SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback)
-    // - void SetDisconnectCallback(std::function<void(Session*)> callback)
-    // - void SetErrorCallback(std::function<void(Session*, ErrorCode)> callback)
-
-    // 네트워크 모델의 베이스 (인터페이스 정의용, 실제 사용되지 않음)
+    // 네트워크 모델 인터페이스
+    // 모든 네트워크 모델(IOCP, RIO, epoll, io_uring)이 구현해야 하는 공통 인터페이스
+    // 템플릿 기반 설계와 함께 인터페이스 상속을 통해 타입 안전성과 명확성을 보장
     class INetworkModel
     {
     public:

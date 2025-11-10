@@ -26,6 +26,19 @@ namespace KanchoNet
     class SocketUtils
     {
     public:
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+    #ifdef KANCHONET_PLATFORM_WINDOWS
+        static LPFN_ACCEPTEX mLpfnAcceptEx;
+        static LPFN_CONNECTEX mLpfnConnectEx;
+        static LPFN_DISCONNECTEX mLpfnDisconnectEx;
+        static LPFN_GETACCEPTEXSOCKADDRS mLpfnGetAcceptExSockaddrs;
+    #endif
+        
+    public:
+        // public 함수
         // 네트워크 초기화/종료
         static bool InitializeNetwork();
         static void CleanupNetwork();
@@ -59,16 +72,10 @@ namespace KanchoNet
         static bool LoadExtensionFunctions(SOCKET socket);
         
         // Windows Extension Functions
-        static LPFN_ACCEPTEX GetAcceptEx() { return lpfnAcceptEx_; }
-        static LPFN_CONNECTEX GetConnectEx() { return lpfnConnectEx_; }
-        static LPFN_DISCONNECTEX GetDisconnectEx() { return lpfnDisconnectEx_; }
-        static LPFN_GETACCEPTEXSOCKADDRS GetAcceptExSockaddrs() { return lpfnGetAcceptExSockaddrs_; }
-
-    private:
-        static LPFN_ACCEPTEX lpfnAcceptEx_;
-        static LPFN_CONNECTEX lpfnConnectEx_;
-        static LPFN_DISCONNECTEX lpfnDisconnectEx_;
-        static LPFN_GETACCEPTEXSOCKADDRS lpfnGetAcceptExSockaddrs_;
+        static LPFN_ACCEPTEX GetAcceptEx() { return mLpfnAcceptEx; }
+        static LPFN_CONNECTEX GetConnectEx() { return mLpfnConnectEx; }
+        static LPFN_DISCONNECTEX GetDisconnectEx() { return mLpfnDisconnectEx; }
+        static LPFN_GETACCEPTEXSOCKADDRS GetAcceptExSockaddrs() { return mLpfnGetAcceptExSockaddrs; }
     #endif
     };
 

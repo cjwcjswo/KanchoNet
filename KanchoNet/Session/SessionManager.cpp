@@ -4,10 +4,10 @@
 namespace KanchoNet
 {
     SessionManager::SessionManager(uint32_t maxSessions)
-        : maxSessions_(maxSessions)
-        , nextSessionID_(1) // 0은 INVALID_SESSION_ID
+        : mMaxSessions(maxSessions)
+        , mNextSessionID(1) // 0은 INVALID_SESSION_ID
     {
-        sessions_.reserve(maxSessions);
+        mSessions.reserve(maxSessions);
     }
 
     SessionManager::~SessionManager()
@@ -17,11 +17,11 @@ namespace KanchoNet
 
     Session* SessionManager::AddSession(SocketHandle socket, const SessionConfig& config)
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mMutex);
 
-        if (sessions_.size() >= maxSessions_)
+        if (mSessions.size() >= mMaxSessions)
         {
-            LOG_WARNING("Session limit reached. Max: %u", maxSessions_);
+            LOG_WARNING("Session limit reached. Max: %u", mMaxSessions);
             return nullptr;
         }
 
@@ -29,38 +29,38 @@ namespace KanchoNet
         auto session = std::make_unique<Session>(id, socket, config);
         Session* sessionPtr = session.get();
         
-        sessions_[id] = std::move(session);
+        mSessions[id] = std::move(session);
         
         LOG_DEBUG("Session added. ID: %llu, Socket: %llu, Total: %zu", 
-                  id, socket, sessions_.size());
+                  id, socket, mSessions.size());
         
         return sessionPtr;
     }
 
     bool SessionManager::RemoveSession(SessionID sessionID)
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mMutex);
 
-        auto it = sessions_.find(sessionID);
-        if (it == sessions_.end())
+        auto it = mSessions.find(sessionID);
+        if (it == mSessions.end())
         {
             return false;
         }
 
-        sessions_.erase(it);
+        mSessions.erase(it);
         
         LOG_DEBUG("Session removed. ID: %llu, Remaining: %zu", 
-                  sessionID, sessions_.size());
+                  sessionID, mSessions.size());
         
         return true;
     }
 
     Session* SessionManager::GetSession(SessionID sessionID)
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mMutex);
 
-        auto it = sessions_.find(sessionID);
-        if (it == sessions_.end())
+        auto it = mSessions.find(sessionID);
+        if (it == mSessions.end())
         {
             return nullptr;
         }
@@ -70,10 +70,10 @@ namespace KanchoNet
 
     const Session* SessionManager::GetSession(SessionID sessionID) const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mMutex);
 
-        auto it = sessions_.find(sessionID);
-        if (it == sessions_.end())
+        auto it = mSessions.find(sessionID);
+        if (it == mSessions.end())
         {
             return nullptr;
         }
@@ -83,15 +83,15 @@ namespace KanchoNet
 
     bool SessionManager::HasSession(SessionID sessionID) const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return sessions_.find(sessionID) != sessions_.end();
+        std::lock_guard<std::mutex> lock(mMutex);
+        return mSessions.find(sessionID) != mSessions.end();
     }
 
     void SessionManager::ForEachSession(std::function<void(Session*)> callback)
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mMutex);
 
-        for (auto& pair : sessions_)
+        for (auto& pair : mSessions)
         {
             callback(pair.second.get());
         }
@@ -99,21 +99,21 @@ namespace KanchoNet
 
     size_t SessionManager::GetSessionCount() const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return sessions_.size();
+        std::lock_guard<std::mutex> lock(mMutex);
+        return mSessions.size();
     }
 
     void SessionManager::Clear()
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-        sessions_.clear();
+        std::lock_guard<std::mutex> lock(mMutex);
+        mSessions.clear();
         LOG_INFO("All sessions cleared");
     }
 
     SessionID SessionManager::GenerateSessionID()
     {
         // 단순 증가 방식 (충돌 없음)
-        return nextSessionID_.fetch_add(1, std::memory_order_relaxed);
+        return mNextSessionID.fetch_add(1, std::memory_order_relaxed);
     }
 
 } // namespace KanchoNet

@@ -3,8 +3,22 @@
 
 #ifdef KANCHONET_PLATFORM_WINDOWS
     #include <WS2tcpip.h>
+    #include <MSTCPIP.h>
     #pragma comment(lib, "ws2_32.lib")
     #pragma comment(lib, "mswsock.lib")
+    
+    // Windows TCP Keep-Alive 구조체 정의 (MSTCPIP.h에 있지만 명시적으로 정의)
+    #ifndef SIO_KEEPALIVE_VALS
+        #define SIO_KEEPALIVE_VALS _WSAIOW(IOC_VENDOR, 4)
+    #endif
+    
+    #ifndef TCP_KEEPALIVE
+        struct tcp_keepalive {
+            ULONG onoff;
+            ULONG keepalivetime;
+            ULONG keepaliveinterval;
+        };
+    #endif
 #elif defined(KANCHONET_PLATFORM_LINUX)
     #include <sys/ioctl.h>
     #include <netinet/tcp.h>
@@ -14,10 +28,10 @@ namespace KanchoNet
 {
     #ifdef KANCHONET_PLATFORM_WINDOWS
     // Windows Static 멤버 변수 초기화
-    LPFN_ACCEPTEX SocketUtils::lpfnAcceptEx_ = nullptr;
-    LPFN_CONNECTEX SocketUtils::lpfnConnectEx_ = nullptr;
-    LPFN_DISCONNECTEX SocketUtils::lpfnDisconnectEx_ = nullptr;
-    LPFN_GETACCEPTEXSOCKADDRS SocketUtils::lpfnGetAcceptExSockaddrs_ = nullptr;
+    LPFN_ACCEPTEX SocketUtils::mLpfnAcceptEx = nullptr;
+    LPFN_CONNECTEX SocketUtils::mLpfnConnectEx = nullptr;
+    LPFN_DISCONNECTEX SocketUtils::mLpfnDisconnectEx = nullptr;
+    LPFN_GETACCEPTEXSOCKADDRS SocketUtils::mLpfnGetAcceptExSockaddrs = nullptr;
     #endif
 
     bool SocketUtils::InitializeNetwork()
@@ -75,24 +89,24 @@ namespace KanchoNet
     bool SocketUtils::SetSocketOption(SocketHandle socket, const EngineConfig& config)
     {
         // Nagle 알고리즘 설정
-        if (!SetNoDelay(socket, config.noDelay))
+        if (!SetNoDelay(socket, config.mNoDelay))
         {
             LOG_WARNING("Failed to set NoDelay option");
         }
 
         // Keep-Alive 설정
-        if (!SetKeepAlive(socket, config.keepAlive, config.keepAliveTime, config.keepAliveInterval))
+        if (!SetKeepAlive(socket, config.mKeepAlive, config.mKeepAliveTime, config.mKeepAliveInterval))
         {
             LOG_WARNING("Failed to set KeepAlive option");
         }
 
         // 송수신 버퍼 크기 설정
-        if (!SetSendBufferSize(socket, static_cast<int>(config.sendBufferSize)))
+        if (!SetSendBufferSize(socket, static_cast<int>(config.mSendBufferSize)))
         {
             LOG_WARNING("Failed to set send buffer size");
         }
 
-        if (!SetRecvBufferSize(socket, static_cast<int>(config.recvBufferSize)))
+        if (!SetRecvBufferSize(socket, static_cast<int>(config.mRecvBufferSize)))
         {
             LOG_WARNING("Failed to set recv buffer size");
         }
@@ -316,7 +330,7 @@ namespace KanchoNet
         // AcceptEx
         if (WSAIoctl(socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
                     &guidAcceptEx, sizeof(guidAcceptEx),
-                    &lpfnAcceptEx_, sizeof(lpfnAcceptEx_),
+                    &mLpfnAcceptEx, sizeof(mLpfnAcceptEx),
                     &bytes, nullptr, nullptr) == SOCKET_ERROR)
         {
             LOG_ERROR("Failed to load AcceptEx. Error: %d", GetLastSocketError());
@@ -326,7 +340,7 @@ namespace KanchoNet
         // ConnectEx
         if (WSAIoctl(socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
                     &guidConnectEx, sizeof(guidConnectEx),
-                    &lpfnConnectEx_, sizeof(lpfnConnectEx_),
+                    &mLpfnConnectEx, sizeof(mLpfnConnectEx),
                     &bytes, nullptr, nullptr) == SOCKET_ERROR)
         {
             LOG_ERROR("Failed to load ConnectEx. Error: %d", GetLastSocketError());
@@ -336,7 +350,7 @@ namespace KanchoNet
         // DisconnectEx
         if (WSAIoctl(socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
                     &guidDisconnectEx, sizeof(guidDisconnectEx),
-                    &lpfnDisconnectEx_, sizeof(lpfnDisconnectEx_),
+                    &mLpfnDisconnectEx, sizeof(mLpfnDisconnectEx),
                     &bytes, nullptr, nullptr) == SOCKET_ERROR)
         {
             LOG_ERROR("Failed to load DisconnectEx. Error: %d", GetLastSocketError());
@@ -346,7 +360,7 @@ namespace KanchoNet
         // GetAcceptExSockaddrs
         if (WSAIoctl(socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
                     &guidGetAcceptExSockaddrs, sizeof(guidGetAcceptExSockaddrs),
-                    &lpfnGetAcceptExSockaddrs_, sizeof(lpfnGetAcceptExSockaddrs_),
+                    &mLpfnGetAcceptExSockaddrs, sizeof(mLpfnGetAcceptExSockaddrs),
                     &bytes, nullptr, nullptr) == SOCKET_ERROR)
         {
             LOG_ERROR("Failed to load GetAcceptExSockaddrs. Error: %d", GetLastSocketError());

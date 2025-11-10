@@ -3,13 +3,13 @@
 namespace KanchoNet
 {
     BufferPool::BufferPool(size_t bufferSize, size_t initialCount)
-        : bufferSize_(bufferSize)
-        , totalAllocated_(0)
+        : mBufferSize(bufferSize)
+        , mTotalAllocated(0)
     {
-        pool_.reserve(initialCount);
+        mPool.reserve(initialCount);
         for (size_t i = 0; i < initialCount; ++i)
         {
-            pool_.push_back(std::make_unique<PacketBuffer>(bufferSize_));
+            mPool.push_back(std::make_unique<PacketBuffer>(mBufferSize));
         }
     }
 
@@ -20,19 +20,19 @@ namespace KanchoNet
 
     std::unique_ptr<PacketBuffer> BufferPool::Allocate()
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mMutex);
         
-        if (!pool_.empty())
+        if (!mPool.empty())
         {
-            auto buffer = std::move(pool_.back());
-            pool_.pop_back();
+            auto buffer = std::move(mPool.back());
+            mPool.pop_back();
             buffer->Clear(); // 재사용을 위해 초기화
             return buffer;
         }
         
         // 풀이 비어있으면 새로 할당
-        ++totalAllocated_;
-        return std::make_unique<PacketBuffer>(bufferSize_);
+        ++mTotalAllocated;
+        return std::make_unique<PacketBuffer>(mBufferSize);
     }
 
     void BufferPool::Deallocate(std::unique_ptr<PacketBuffer> buffer)
@@ -40,29 +40,29 @@ namespace KanchoNet
         if (!buffer)
             return;
 
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mMutex);
         
         // 풀 크기 제한 (너무 많이 쌓이는 것 방지)
         constexpr size_t MAX_POOL_SIZE = 1000;
-        if (pool_.size() < MAX_POOL_SIZE)
+        if (mPool.size() < MAX_POOL_SIZE)
         {
             buffer->Clear();
-            pool_.push_back(std::move(buffer));
+            mPool.push_back(std::move(buffer));
         }
         // else: 버퍼를 폐기 (unique_ptr이 자동으로 삭제)
     }
 
     size_t BufferPool::GetPoolSize() const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return pool_.size();
+        std::lock_guard<std::mutex> lock(mMutex);
+        return mPool.size();
     }
 
     void BufferPool::Clear()
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-        pool_.clear();
-        totalAllocated_ = 0;
+        std::lock_guard<std::mutex> lock(mMutex);
+        mPool.clear();
+        mTotalAllocated = 0;
     }
 
 } // namespace KanchoNet

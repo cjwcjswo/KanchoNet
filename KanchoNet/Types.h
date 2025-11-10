@@ -29,8 +29,9 @@ namespace KanchoNet
     #ifdef KANCHONET_PLATFORM_WINDOWS
         using SocketHandle = SOCKET;
         using FileHandle = HANDLE;
-        constexpr SocketHandle INVALID_SOCKET_HANDLE = INVALID_SOCKET;
-        constexpr FileHandle INVALID_FILE_HANDLE = INVALID_HANDLE_VALUE;
+        // Windows에서는 INVALID_SOCKET과 INVALID_HANDLE_VALUE가 매크로이므로 constexpr 사용 불가
+        const SocketHandle INVALID_SOCKET_HANDLE = INVALID_SOCKET;
+        const FileHandle INVALID_FILE_HANDLE = INVALID_HANDLE_VALUE;
     #elif defined(KANCHONET_PLATFORM_LINUX)
         using SocketHandle = int;
         using FileHandle = int;

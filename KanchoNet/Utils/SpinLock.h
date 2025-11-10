@@ -9,7 +9,15 @@ namespace KanchoNet
     class SpinLock
     {
     public:
-        SpinLock() : flag_(false) {}
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+        std::atomic<bool> mFlag;
+        
+    public:
+        // 생성자, 파괴자
+        SpinLock() : mFlag(false) {}
         ~SpinLock() = default;
 
         // 복사/이동 불가
@@ -17,14 +25,16 @@ namespace KanchoNet
         SpinLock& operator=(const SpinLock&) = delete;
         SpinLock(SpinLock&&) = delete;
         SpinLock& operator=(SpinLock&&) = delete;
-
+        
+    public:
+        // public 함수
         // 락 획득
         void lock()
         {
-            while (flag_.exchange(true, std::memory_order_acquire))
+            while (mFlag.exchange(true, std::memory_order_acquire))
             {
                 // 스핀 대기
-                while (flag_.load(std::memory_order_relaxed))
+                while (mFlag.load(std::memory_order_relaxed))
                 {
                     // CPU에게 힌트를 주어 성능 향상
                     #if defined(_MSC_VER)
@@ -39,39 +49,41 @@ namespace KanchoNet
         // 락 해제
         void unlock()
         {
-            flag_.store(false, std::memory_order_release);
+            mFlag.store(false, std::memory_order_release);
         }
 
         // 락 시도 (블로킹하지 않음)
         bool try_lock()
         {
-            return !flag_.exchange(true, std::memory_order_acquire);
+            return !mFlag.exchange(true, std::memory_order_acquire);
         }
-
-    private:
-        std::atomic<bool> flag_;
     };
 
     // RAII 스타일 락 가드
     class SpinLockGuard
     {
     public:
-        explicit SpinLockGuard(SpinLock& lock) : lock_(lock)
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+        SpinLock& mLock;
+        
+    public:
+        // 생성자, 파괴자
+        explicit SpinLockGuard(SpinLock& lock) : mLock(lock)
         {
-            lock_.lock();
+            mLock.lock();
         }
 
         ~SpinLockGuard()
         {
-            lock_.unlock();
+            mLock.unlock();
         }
 
         // 복사/이동 불가
         SpinLockGuard(const SpinLockGuard&) = delete;
         SpinLockGuard& operator=(const SpinLockGuard&) = delete;
-
-    private:
-        SpinLock& lock_;
     };
 
 } // namespace KanchoNet

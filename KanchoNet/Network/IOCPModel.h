@@ -16,30 +16,54 @@
 namespace KanchoNet
 {
     // IOCP (I/O Completion Port) 네트워크 모델
-    class IOCPModel : public NonCopyable
+    class IOCPModel : public INetworkModel, public NonCopyable
     {
     public:
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+        bool mInitialized;
+        bool mRunning;
+        
+        EngineConfig mConfig;
+        SOCKET mListenSocket;
+        HANDLE mIocpHandle;
+        
+        std::unique_ptr<SessionManager> mSessionManager;
+        
+        // 콜백 함수들
+        std::function<void(Session*)> mOnAccept;
+        std::function<void(Session*, const uint8_t*, size_t)> mOnReceive;
+        std::function<void(Session*)> mOnDisconnect;
+        std::function<void(Session*, ErrorCode)> mOnError;
+        
+    public:
+        // 생성자, 파괴자
         IOCPModel();
         ~IOCPModel();
-
+        
+    public:
+        // public 함수
         // INetworkModel 인터페이스 구현
-        bool Initialize(const EngineConfig& config);
-        bool StartListen();
-        bool ProcessIO(uint32_t timeoutMs = 0);
-        bool Send(Session* session, const PacketBuffer& buffer);
-        void Shutdown();
+        bool Initialize(const EngineConfig& config) override;
+        bool StartListen() override;
+        bool ProcessIO(uint32_t timeoutMs = 0) override;
+        bool Send(Session* session, const PacketBuffer& buffer) override;
+        void Shutdown() override;
 
         // 콜백 설정
-        void SetAcceptCallback(std::function<void(Session*)> callback);
-        void SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback);
-        void SetDisconnectCallback(std::function<void(Session*)> callback);
-        void SetErrorCallback(std::function<void(Session*, ErrorCode)> callback);
+        void SetAcceptCallback(std::function<void(Session*)> callback) override;
+        void SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback) override;
+        void SetDisconnectCallback(std::function<void(Session*)> callback) override;
+        void SetErrorCallback(std::function<void(Session*, ErrorCode)> callback) override;
 
         // 상태 확인
-        bool IsInitialized() const { return initialized_; }
-        bool IsRunning() const { return running_; }
+        bool IsInitialized() const { return mInitialized; }
+        bool IsRunning() const { return mRunning; }
 
     private:
+        // private 함수
         // Overlapped I/O 컨텍스트
         struct OverlappedContext
         {
@@ -66,22 +90,6 @@ namespace KanchoNet
         
         OverlappedContext* AllocateContext();
         void DeallocateContext(OverlappedContext* context);
-
-        // 멤버 변수
-        bool initialized_;
-        bool running_;
-        
-        EngineConfig config_;
-        SOCKET listenSocket_;
-        HANDLE iocpHandle_;
-        
-        std::unique_ptr<SessionManager> sessionManager_;
-        
-        // 콜백 함수들
-        std::function<void(Session*)> onAccept_;
-        std::function<void(Session*, const uint8_t*, size_t)> onReceive_;
-        std::function<void(Session*)> onDisconnect_;
-        std::function<void(Session*, ErrorCode)> onError_;
     };
 
 } // namespace KanchoNet

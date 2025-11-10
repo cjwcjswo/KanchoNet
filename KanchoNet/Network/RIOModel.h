@@ -19,31 +19,13 @@ namespace KanchoNet
 {
     // RIO (Registered I/O) 네트워크 모델
     // Windows 8 이상에서 지원되는 고성능 I/O 모델
-    class RIOModel : public NonCopyable
+    class RIOModel : public INetworkModel, public NonCopyable
     {
     public:
-        RIOModel();
-        ~RIOModel();
-
-        // INetworkModel 인터페이스 구현
-        bool Initialize(const EngineConfig& config);
-        bool StartListen();
-        bool ProcessIO(uint32_t timeoutMs = 0);
-        bool Send(Session* session, const PacketBuffer& buffer);
-        void Shutdown();
-
-        // 콜백 설정
-        void SetAcceptCallback(std::function<void(Session*)> callback);
-        void SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback);
-        void SetDisconnectCallback(std::function<void(Session*)> callback);
-        void SetErrorCallback(std::function<void(Session*, ErrorCode)> callback);
-
-        // 상태 확인
-        bool IsInitialized() const { return initialized_; }
-        bool IsRunning() const { return running_; }
-        bool IsRIOSupported() const;
-
+        // public 멤버변수 (없음)
+        
     private:
+        // private 함수 - 구조체 정의 (멤버 변수 선언 전에 정의 필요)
         // RIO 버퍼 정보
         struct RIOBufferInfo
         {
@@ -60,7 +42,62 @@ namespace KanchoNet
             Session* session;
             RIO_BUF rioBuf;
         };
+        
+        // private 멤버변수
+        bool mInitialized;
+        bool mRunning;
+        
+        EngineConfig mConfig;
+        SOCKET mListenSocket;
+        
+        // RIO Extension Functions
+        RIO_EXTENSION_FUNCTION_TABLE mRioFunctions;
+        RIO_CQ mCompletionQueue;
+        OVERLAPPED mOverlapped;
+        
+        // RIO 버퍼
+        RIOBufferInfo mRecvBufferInfo;
+        RIOBufferInfo mSendBufferInfo;
+        
+        std::unique_ptr<SessionManager> mSessionManager;
+        
+        // 콜백 함수들
+        std::function<void(Session*)> mOnAccept;
+        std::function<void(Session*, const uint8_t*, size_t)> mOnReceive;
+        std::function<void(Session*)> mOnDisconnect;
+        std::function<void(Session*, ErrorCode)> mOnError;
+        
+        // RIO 지원 여부
+        static bool mRioSupportChecked;
+        static bool mRioSupported;
+        
+    public:
+        // 생성자, 파괴자
+        RIOModel();
+        ~RIOModel();
+        
+    public:
+        // public 함수
+        // INetworkModel 인터페이스 구현
+        bool Initialize(const EngineConfig& config) override;
+        bool StartListen() override;
+        bool ProcessIO(uint32_t timeoutMs = 0) override;
+        bool Send(Session* session, const PacketBuffer& buffer) override;
+        void Shutdown() override;
 
+        // 콜백 설정
+        void SetAcceptCallback(std::function<void(Session*)> callback) override;
+        void SetReceiveCallback(std::function<void(Session*, const uint8_t*, size_t)> callback) override;
+        void SetDisconnectCallback(std::function<void(Session*)> callback) override;
+        void SetErrorCallback(std::function<void(Session*, ErrorCode)> callback) override;
+
+        // 상태 확인
+        bool IsInitialized() const { return mInitialized; }
+        bool IsRunning() const { return mRunning; }
+        bool IsRIOSupported() const;
+
+    private:
+        // private 함수
         // 내부 함수들
         bool LoadRIOFunctions();
         bool CreateRIOResources();
@@ -80,34 +117,6 @@ namespace KanchoNet
         
         RIOContext* AllocateContext();
         void DeallocateContext(RIOContext* context);
-
-        // 멤버 변수
-        bool initialized_;
-        bool running_;
-        
-        EngineConfig config_;
-        SOCKET listenSocket_;
-        
-        // RIO Extension Functions
-        RIO_EXTENSION_FUNCTION_TABLE rioFunctions_;
-        RIO_CQ completionQueue_;
-        OVERLAPPED overlapped_;
-        
-        // RIO 버퍼
-        RIOBufferInfo recvBufferInfo_;
-        RIOBufferInfo sendBufferInfo_;
-        
-        std::unique_ptr<SessionManager> sessionManager_;
-        
-        // 콜백 함수들
-        std::function<void(Session*)> onAccept_;
-        std::function<void(Session*, const uint8_t*, size_t)> onReceive_;
-        std::function<void(Session*)> onDisconnect_;
-        std::function<void(Session*, ErrorCode)> onError_;
-        
-        // RIO 지원 여부
-        static bool rioSupportChecked_;
-        static bool rioSupported_;
     };
 
 } // namespace KanchoNet

@@ -17,9 +17,23 @@ namespace KanchoNet
     class NetworkEngine : public NonCopyable
     {
     public:
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+        std::atomic<bool> mInitialized;
+        std::atomic<bool> mRunning;
+        
+        EngineConfig mConfig;
+        std::unique_ptr<TNetworkModel> mNetworkModel;
+        
+    public:
+        // 생성자, 파괴자
         NetworkEngine();
         virtual ~NetworkEngine();
-
+        
+    public:
+        // public 함수
         // 초기화 및 시작
         bool Initialize(const EngineConfig& config);
         bool Start();
@@ -39,11 +53,11 @@ namespace KanchoNet
         void Broadcast(const PacketBuffer& buffer);
         
         // 상태 확인
-        bool IsInitialized() const { return initialized_; }
-        bool IsRunning() const { return running_; }
+        bool IsInitialized() const { return mInitialized; }
+        bool IsRunning() const { return mRunning; }
 
         // 설정 정보
-        const EngineConfig& GetConfig() const { return config_; }
+        const EngineConfig& GetConfig() const { return mConfig; }
 
     protected:
         // 어플리케이션에서 오버라이드할 콜백 함수들
@@ -53,27 +67,21 @@ namespace KanchoNet
         virtual void OnError(Session* session, ErrorCode errorCode) {}
 
     private:
+        // private 함수
         // 내부 콜백 핸들러들
         void HandleAccept(Session* session);
         void HandleReceive(Session* session, const uint8_t* data, size_t size);
         void HandleDisconnect(Session* session);
         void HandleError(Session* session, ErrorCode errorCode);
-
-        // 멤버 변수
-        std::atomic<bool> initialized_;
-        std::atomic<bool> running_;
-        
-        EngineConfig config_;
-        std::unique_ptr<TNetworkModel> networkModel_;
     };
 
     // 템플릿 구현 (헤더에 포함)
     template<typename TNetworkModel>
     NetworkEngine<TNetworkModel>::NetworkEngine()
-        : initialized_(false)
-        , running_(false)
+        : mInitialized(false)
+        , mRunning(false)
     {
-        networkModel_ = std::make_unique<TNetworkModel>();
+        mNetworkModel = std::make_unique<TNetworkModel>();
     }
 
     template<typename TNetworkModel>
@@ -85,7 +93,7 @@ namespace KanchoNet
     template<typename TNetworkModel>
     bool NetworkEngine<TNetworkModel>::Initialize(const EngineConfig& config)
     {
-        if (initialized_)
+        if (mInitialized)
         {
             return false;
         }
@@ -95,109 +103,109 @@ namespace KanchoNet
             return false;
         }
 
-        config_ = config;
+        mConfig = config;
 
         // 네트워크 모델에 콜백 설정
-        networkModel_->SetAcceptCallback([this](Session* session) {
+        mNetworkModel->SetAcceptCallback([this](Session* session) {
             HandleAccept(session);
         });
 
-        networkModel_->SetReceiveCallback([this](Session* session, const uint8_t* data, size_t size) {
+        mNetworkModel->SetReceiveCallback([this](Session* session, const uint8_t* data, size_t size) {
             HandleReceive(session, data, size);
         });
 
-        networkModel_->SetDisconnectCallback([this](Session* session) {
+        mNetworkModel->SetDisconnectCallback([this](Session* session) {
             HandleDisconnect(session);
         });
 
-        networkModel_->SetErrorCallback([this](Session* session, ErrorCode errorCode) {
+        mNetworkModel->SetErrorCallback([this](Session* session, ErrorCode errorCode) {
             HandleError(session, errorCode);
         });
 
         // 네트워크 모델 초기화
-        if (!networkModel_->Initialize(config_))
+        if (!mNetworkModel->Initialize(mConfig))
         {
             return false;
         }
 
-        initialized_ = true;
+        mInitialized = true;
         return true;
     }
 
     template<typename TNetworkModel>
     bool NetworkEngine<TNetworkModel>::Start()
     {
-        if (!initialized_ || running_)
+        if (!mInitialized || mRunning)
         {
             return false;
         }
 
-        if (!networkModel_->StartListen())
+        if (!mNetworkModel->StartListen())
         {
             return false;
         }
 
-        running_ = true;
+        mRunning = true;
         return true;
     }
 
     template<typename TNetworkModel>
     void NetworkEngine<TNetworkModel>::Stop()
     {
-        if (!running_)
+        if (!mRunning)
         {
             return;
         }
 
-        running_ = false;
+        mRunning = false;
         
-        if (networkModel_)
+        if (mNetworkModel)
         {
-            networkModel_->Shutdown();
+            mNetworkModel->Shutdown();
         }
 
-        initialized_ = false;
+        mInitialized = false;
     }
 
     template<typename TNetworkModel>
     bool NetworkEngine<TNetworkModel>::ProcessIO(uint32_t timeoutMs)
     {
-        if (!running_)
+        if (!mRunning)
         {
             return false;
         }
 
-        return networkModel_->ProcessIO(timeoutMs);
+        return mNetworkModel->ProcessIO(timeoutMs);
     }
 
     template<typename TNetworkModel>
     bool NetworkEngine<TNetworkModel>::Send(Session* session, const PacketBuffer& buffer)
     {
-        if (!running_ || !session)
+        if (!mRunning || !session)
         {
             return false;
         }
 
-        return networkModel_->Send(session, buffer);
+        return mNetworkModel->Send(session, buffer);
     }
 
     template<typename TNetworkModel>
     bool NetworkEngine<TNetworkModel>::Send(Session* session, const void* data, size_t size)
     {
-        if (!running_ || !session || !data || size == 0)
+        if (!mRunning || !session || !data || size == 0)
         {
             return false;
         }
 
         PacketBuffer buffer(data, size);
-        return networkModel_->Send(session, buffer);
+        return mNetworkModel->Send(session, buffer);
     }
 
     template<typename TNetworkModel>
     Session* NetworkEngine<TNetworkModel>::GetSession(SessionID sessionID)
     {
         // 네트워크 모델에서 세션 매니저를 통해 검색
-        // 실제로는 networkModel_이 SessionManager를 노출하거나
+        // 실제로는 mNetworkModel이 SessionManager를 노출하거나
         // 별도의 세션 관리 인터페이스가 필요
         // 현재 구현에서는 간단히 nullptr 반환
         return nullptr;

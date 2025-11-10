@@ -3,14 +3,14 @@
 namespace KanchoNet
 {
     Session::Session(SessionID id, SocketHandle socket, const SessionConfig& config)
-        : id_(id)
-        , socket_(socket)
-        , state_(SessionState::Idle)
-        , sendBuffer_(config.maxPacketSize * 2)  // 송신 버퍼
-        , recvBuffer_(config.maxPacketSize * 2)  // 수신 버퍼
-        , userData_(nullptr)
-        , isSending_(false)
-        , config_(config)
+        : mID(id)
+        , mSocket(socket)
+        , mState(SessionState::Idle)
+        , mSendBuffer(config.mMaxPacketSize * 2)  // 송신 버퍼
+        , mRecvBuffer(config.mMaxPacketSize * 2)  // 수신 버퍼
+        , mUserData(nullptr)
+        , mIsSending(false)
+        , mConfig(config)
     {
     }
 
@@ -19,36 +19,36 @@ namespace KanchoNet
     }
 
     Session::Session(Session&& other) noexcept
-        : id_(other.id_)
-        , socket_(other.socket_)
-        , state_(other.state_.load())
-        , sendBuffer_(std::move(other.sendBuffer_))
-        , recvBuffer_(std::move(other.recvBuffer_))
-        , userData_(other.userData_)
-        , isSending_(other.isSending_.load())
-        , config_(other.config_)
+        : mID(other.mID)
+        , mSocket(other.mSocket)
+        , mState(other.mState.load())
+        , mSendBuffer(std::move(other.mSendBuffer))
+        , mRecvBuffer(std::move(other.mRecvBuffer))
+        , mUserData(other.mUserData)
+        , mIsSending(other.mIsSending.load())
+        , mConfig(other.mConfig)
     {
-        other.id_ = INVALID_SESSION_ID;
-        other.socket_ = INVALID_SOCKET_HANDLE;
-        other.userData_ = nullptr;
+        other.mID = INVALID_SESSION_ID;
+        other.mSocket = INVALID_SOCKET_HANDLE;
+        other.mUserData = nullptr;
     }
 
     Session& Session::operator=(Session&& other) noexcept
     {
         if (this != &other)
         {
-            id_ = other.id_;
-            socket_ = other.socket_;
-            state_.store(other.state_.load());
-            sendBuffer_ = std::move(other.sendBuffer_);
-            recvBuffer_ = std::move(other.recvBuffer_);
-            userData_ = other.userData_;
-            isSending_.store(other.isSending_.load());
-            config_ = other.config_;
+            mID = other.mID;
+            mSocket = other.mSocket;
+            mState.store(other.mState.load());
+            mSendBuffer = std::move(other.mSendBuffer);
+            mRecvBuffer = std::move(other.mRecvBuffer);
+            mUserData = other.mUserData;
+            mIsSending.store(other.mIsSending.load());
+            mConfig = other.mConfig;
 
-            other.id_ = INVALID_SESSION_ID;
-            other.socket_ = INVALID_SOCKET_HANDLE;
-            other.userData_ = nullptr;
+            other.mID = INVALID_SESSION_ID;
+            other.mSocket = INVALID_SOCKET_HANDLE;
+            other.mUserData = nullptr;
         }
         return *this;
     }

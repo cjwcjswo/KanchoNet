@@ -20,11 +20,29 @@ namespace KanchoNet
     class Logger
     {
     public:
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+        LogLevel mCurrentLevel;
+        std::mutex mMutex;
+        
+    public:
+        // 생성자, 파괴자
+        Logger();
+        ~Logger() = default;
+
+        // 복사/이동 불가
+        Logger(const Logger&) = delete;
+        Logger& operator=(const Logger&) = delete;
+        
+    public:
+        // public 함수
         static Logger& GetInstance();
 
         // 로그 레벨 설정
-        void SetLogLevel(LogLevel level) { currentLevel_ = level; }
-        LogLevel GetLogLevel() const { return currentLevel_; }
+        void SetLogLevel(LogLevel level) { mCurrentLevel = level; }
+        LogLevel GetLogLevel() const { return mCurrentLevel; }
 
         // 로그 출력
         void Log(LogLevel level, const char* format, ...);
@@ -38,18 +56,9 @@ namespace KanchoNet
         void LogErrorCode(ErrorCode errorCode, const char* context = nullptr);
 
     private:
-        Logger();
-        ~Logger() = default;
-
-        // 복사/이동 불가
-        Logger(const Logger&) = delete;
-        Logger& operator=(const Logger&) = delete;
-
+        // private 함수
         const char* GetLogLevelString(LogLevel level) const;
         const char* GetErrorCodeString(ErrorCode errorCode) const;
-
-        LogLevel currentLevel_;
-        std::mutex mutex_;
     };
 
     // 편의 매크로

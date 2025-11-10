@@ -24,11 +24,11 @@ int main()
 
     // 서버 설정
     KanchoNet::EngineConfig config;
-    config.port = 9000;
-    config.maxSessions = 1000;
-    config.backlog = 200;
-    config.noDelay = true;
-    config.keepAlive = true;
+    config.mPort = 9000;
+    config.mMaxSessions = 1000;
+    config.mBacklog = 200;
+    config.mNoDelay = true;
+    config.mKeepAlive = true;
 
     // 초기화
     if (!server.Initialize(config))
@@ -44,7 +44,7 @@ int main()
         return 1;
     }
 
-    std::cout << "Echo Server started on port " << config.port << std::endl;
+    std::cout << "Echo Server started on port " << config.mPort << std::endl;
     std::cout << "Press 'q' + Enter to quit" << std::endl;
     std::cout << std::endl;
 

@@ -11,7 +11,15 @@ namespace KanchoNet
     class PacketBuffer
     {
     public:
-        // 생성자
+        // public 멤버변수 (없음)
+        
+    private:
+        // private 멤버변수
+        std::vector<uint8_t> mData;
+        size_t mSize;  // 실제 사용 중인 데이터 크기
+        
+    public:
+        // 생성자, 파괴자
         PacketBuffer();
         explicit PacketBuffer(size_t initialCapacity);
         PacketBuffer(const void* data, size_t size);
@@ -24,12 +32,14 @@ namespace KanchoNet
         
         // 소멸자
         ~PacketBuffer();
-
+        
+    public:
+        // public 함수
         // 데이터 접근
-        const uint8_t* GetData() const { return data_.data(); }
-        uint8_t* GetData() { return data_.data(); }
-        size_t GetSize() const { return size_; }
-        size_t GetCapacity() const { return data_.capacity(); }
+        const uint8_t* GetData() const { return mData.data(); }
+        uint8_t* GetData() { return mData.data(); }
+        size_t GetSize() const { return mSize; }
+        size_t GetCapacity() const { return mData.capacity(); }
         
         // 데이터 조작
         void Clear();
@@ -44,11 +54,7 @@ namespace KanchoNet
         void SetData(const void* data, size_t size);
         
         // 유효성 검사
-        bool IsEmpty() const { return size_ == 0; }
-        
-    private:
-        std::vector<uint8_t> data_;
-        size_t size_;  // 실제 사용 중인 데이터 크기
+        bool IsEmpty() const { return mSize == 0; }
     };
 
 } // namespace KanchoNet
